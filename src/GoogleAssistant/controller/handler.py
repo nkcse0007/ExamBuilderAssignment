@@ -3,7 +3,7 @@ import requests
 import json
 import os
 from database import db
-from src.Intent.controller.test import test_intent
+from src.Intent.controller.test import find_answer
 from src.CommonHelpers.com import *
 
 res = {
@@ -25,7 +25,7 @@ def handle_action(action, req, is_login, user_data, login_data):
     base_cmp = cmp_obj.base_cmp()
     text = ''
     if not is_login:
-        text = login_assistant(user_data, login_data, req)
+        text, user_data = login_assistant(user_data, login_data, req)
     if text:
         res = {
             'type': 'question',
@@ -36,10 +36,9 @@ def handle_action(action, req, is_login, user_data, login_data):
 
     print(cmp_obj)
 
-    for res in bot_data['response']:
-        res['type'] = 'question'
-        base_cmp = get_response(res, base_cmp)
-
+    # for res in bot_data['response']:
+    base_cmp = get_response(bot_data, base_cmp)
+    print(base_cmp)
     return base_cmp
 
 
@@ -56,7 +55,7 @@ def save_conversation(user_data, response):
 
 def login_assistant(user_data, login_data, req):
     text = ''
-
+    user = None
     if not login_data:
         text = os.environ.get('USERNAME_QUESTION')
         db['VoiceLogin'].update_one(
@@ -75,7 +74,8 @@ def login_assistant(user_data, login_data, req):
                     text = 'Your username does not match. Please try again'
                 else:
                     db['VoiceLogin'].update_one(
-                        {'platform_id': req['originalDetectIntentRequest']['payload']['conversation']['conversationId']},
+                        {'platform_id': req['originalDetectIntentRequest']['payload']['conversation'][
+                            'conversationId']},
                         {'$set': {
                             'username': req['queryResult']['queryText'].upper(),
                             '_user': user['_id'],
@@ -107,15 +107,16 @@ def login_assistant(user_data, login_data, req):
             )
         else:
             if login_data['_user'] != '':
-                user_data = db['User'].find_one({'_id': login_data['_user']})
-                if user_data['configure']['security'] == 'private':
+                user = db['User'].find_one({'_id': login_data['_user']})
+                if user['configure']['security'] == 'private':
                     if login_data['is_pin_asked']:
                         if login_data['pin'] != '':
-                            if user_data['configure']['pin'] != req['queryResult']['queryText']:
+                            if user['configure']['pin'] != req['queryResult']['queryText']:
                                 text = 'Your pin does match please try again.'
                             else:
                                 db['VoiceLogin'].update_one(
-                                    {'platform_id': req['originalDetectIntentRequest']['payload']['conversation']['conversationId']},
+                                    {'platform_id': req['originalDetectIntentRequest']['payload']['conversation'][
+                                        'conversationId']},
                                     {'$set': {
                                         'pin': req['queryResult']['queryText'],
                                         'is_login': True
@@ -125,73 +126,26 @@ def login_assistant(user_data, login_data, req):
                     else:
                         text = os.environ.get('PIN_QUESTION')
                         db['VoiceLogin'].update_one(
-                            {'platform_id': req['originalDetectIntentRequest']['payload']['conversation']['conversationId']},
+                            {'platform_id': req['originalDetectIntentRequest']['payload']['conversation'][
+                                'conversationId']},
                             {'$set': {
                                 'is_pin_asked': True,
                             }}
                         )
                 else:
                     db['VoiceLogin'].update_one(
-                        {'platform_id': req['originalDetectIntentRequest']['payload']['conversation']['conversationId']},
+                        {'platform_id': req['originalDetectIntentRequest']['payload']['conversation'][
+                            'conversationId']},
                         {'$set': {
                             'is_login': True,
                         }}
                     )
 
-    return text
+    return text, user
 
 
 def get_res_list(action, req, user_data):
-    # import pdb;pdb.set_trace()
-    # url = os.environ.get('BOTPENGUIN_URL') + "/social/facebook"
-    # if req['queryResult']['queryText'] == 'get started':
-    #     req['queryResult']['queryText'] = req['queryResult']['queryText'].capitalize()
-    # if action == 'input.welcome':
-    #     payload = {
-    #         "botId": 1211,
-    #         "event": "get_started",
-    #         "s_id": 'googlebot',
-    #         "ps_id": 'googleassistantbot',
-    #         "platform": "google"
-    #     }
-    #     headers = {
-    #         'Content-Type': "application/json",
-    #         'cache-control': "no-cache",
-    #     }
-    #     try:
-    #         response = requests.request("POST", url, data=json.dumps(payload), headers=headers)
-    #         print(response.text)
-    #         print(response.json())
-    #         chats = response.json()
-    #     except:
-    #         return ['sorry , but i cant get it.']
-    #
-    # elif action == 'input.unknown':
-    #     payload = {
-    #         "botId": 1211,
-    #         "event": "continue",
-    #         "s_id": 'googlebot',
-    #         "ps_id": 'googleassistantbot',
-    #         "platform": "google",
-    #         "answer": req['queryResult']['queryText']
-    #     }
-    #     headers = {
-    #         'Content-Type': "application/json",
-    #         'cache-control': "no-cache",
-    #     }
-    #     try:
-    #         response = requests.request("POST", url, data=json.dumps(payload), headers=headers)
-    #         print(response.text)
-    #         print(response.json())
-    #         chats = response.json()
-    #     except:
-    #         return ['sorry , but i cant get it.']
-    # else:
-    #     chats = ['sorry , but i cant get it.']
-    response, status = test_intent(user_data['_id'])
-    task_data = db['Task'].find_one({'_id': response['response_id']})
-
-    return task_data['responses']
+    return find_answer(user_data, req)
 
 
 def get_response(res, base_cmp):
@@ -200,7 +154,7 @@ def get_response(res, base_cmp):
         base_cmp['payload']['google']['expectUserResponse'] = True
         base_cmp['payload']['google']['richResponse']['items'].append(cmp_obj.simple(res['label']))
 
-    elif res['type'] == 'question':
+    elif res['type'] == 'simple_response':
         base_cmp['payload']['google']['expectUserResponse'] = True
         base_cmp['payload']['google']['richResponse']['items'].append(cmp_obj.simple_tts(res['label']))
 

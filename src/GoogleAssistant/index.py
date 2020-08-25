@@ -17,7 +17,6 @@ voice_app = Blueprint('voice_app', __name__, template_folder='templates')
 @voice_app.route('/technodrift/voice', methods=['POST'])
 def google_assistant():
     # return response
-    # import pdb;pdb.set_trace()
     response = results()
     print(response)
     return make_response(jsonify(response))
@@ -36,8 +35,7 @@ def results():
         action = req.get('result').get('action')
     except:
         action = req.get('queryResult').get('action')
-    import pdb;
-    pdb.set_trace()
+
     login_data = db['VoiceLogin'].find_one({'platform_id': req['originalDetectIntentRequest']['payload']['conversation']['conversationId']})
     if not login_data:
         is_login = False

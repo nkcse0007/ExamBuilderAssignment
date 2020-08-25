@@ -7,7 +7,8 @@ from uuid import uuid4
 class Task:
     def __init__(self, request, user_id):
         self.request = request
-        self.input_data = json.loads(request.data)
+        if request.method != 'GET':
+            self.input_data = json.loads(request.data)
         self.user_id = user_id
 
     def get(self, task_id):

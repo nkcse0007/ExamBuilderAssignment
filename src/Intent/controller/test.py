@@ -18,12 +18,19 @@ def test_intent(user_id):
     else:
         config_file = intent_config(f"{MEDIA_PATH}/task_files/user_{user_id}")
         try:
-            import pdb;pdb.set_trace()
             model = build_model(config_file, download=True)
-            response_id = model([data['question']])[0][0]
+            response = model([data['question']])
+            response_id = response[0][0]
+            score = response[1][0][0]
+            import pdb;pdb.set_trace()
+            threshold = 0.50
             if not response_id:
-                return {'message': '',
+                return {'message': 'training done',
                         'data': {'answer': 'sorry not able to understand, please try  rephrasing'}, 'status': True}, 200
+            elif score < threshold:
+                return {'message': 'training done',
+                        'data': {'answer': 'Sorry not able to understand, please try  rephrasing'},
+                        'status': True}, 200
             else:
                 response = db['Task'].find_one(
                     {'_id': response_id},
@@ -34,3 +41,44 @@ def test_intent(user_id):
             print(e)
             return {'message': 'error! files are not ready, please train it first ' + str(e), 'data': {},
                     'status': False}, 400
+
+
+def find_answer(user, req):
+    try:
+        login_data = db['VoiceLogin'].find_one({'platform_id':
+                                                    req['originalDetectIntentRequest']['payload']['conversation'][
+                                                        'conversationId']})
+        user = db['User'].find_one({'_id': login_data['_user']})
+        config_file = intent_config(f"{MEDIA_PATH}/task_files/user_{user['_id']}")
+        if login_data['is_login'] is False:
+            answer = {
+                'label': 'Please ask my your query!!!',
+                'type': 'simple_response'
+            }
+            db['VoiceLogin'].update_one(
+                {'platform_id':
+                     req['originalDetectIntentRequest']['payload']['conversation'][
+                         'conversationId']},
+                {'$set': {
+                    'is_login': True
+                }}
+            )
+        else:
+            model = build_model(config_file, download=True)
+            response_id = model([req['queryResult']['queryText']])[0][0]
+            if not response_id:
+                answer = {
+                    'label': 'sorry not able to understand, please try  rephrasing',
+                    'type': 'simple_response'
+                }
+            else:
+                response = db['Task'].find_one(
+                    {'_id': response_id},
+                    {'responses': 1, 'label': 1}
+                )
+                answer = response['responses'][0]
+    except Exception as e:
+        print(e)
+        return {'message': 'error! files are not ready, please train it first ' + str(e), 'data': {},
+                'status': False}
+    return answer

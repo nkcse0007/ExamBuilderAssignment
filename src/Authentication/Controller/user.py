@@ -71,22 +71,35 @@ class Login:
 
     def post(self):
         if not self.input_data:
-            return {'message': 'data is missing.', 'status': BadRequest}, 400
+            return {'message': 'data is missing.', 'status': False}, BadRequest
         elif 'email' not in self.input_data or self.input_data['email'] == '':
-            return {'message': 'email is missing.', 'status': BadRequest}, 400
+            return {'message': 'email is missing.', 'status': False}, BadRequest
         elif 'password' not in self.input_data or self.input_data['password'] == '':
-            return {'message': 'password is missing.', 'status': BadRequest}, 400
+            return {'message': 'password is missing.', 'status': False}, BadRequest
         elif not db['User'].find({"email": self.input_data['email'].lower()}).count():
-            return {'message': 'You do not have any account.Please Register first.', 'status': BadRequest}, 400
+            return {'message': 'You do not have any account.Please Register first.', 'status': False}, BadRequest
         else:
             self.input_data['password'] = hashlib.sha512(self.input_data['password'].encode()).hexdigest()
 
             user = db['User'].find_one({"email": self.input_data['email']})
             if self.input_data['password'] != user['password']:
-                return {'message': 'Wrong password, Please try again.', 'status': BadRequest}, 400
+                return {'message': 'Wrong password, Please try again.', 'status': False}, BadRequest
             Jwt = JwtAuth('VoiceAssistant')
             token = Jwt.encode(
                 {'_': str(user['_id']), '___': user['email'], '____': user['name']}, self.request)
-            return {'status': OK,
+            return {'status': True,
                     'message': 'Login successful.',
-                    'data': {'email': user['email'], 'phone': user['phone'], 'token': token.decode()}}, 200
+                    'data': {'email': user['email'], 'phone': user['phone'], 'name': user['name'], 'token': token.decode()}}, OK
+
+
+#
+# class Profile:
+#     def __init__(self, request):
+#         self.request = request
+#         self.input_data = json.loads(request.data)
+#
+#     def get(self):
+#         user_id = get_user_from_token(self.request)
+#         user = db['User'].find_one({"_id": user_id}, {'_name': })
+
+
