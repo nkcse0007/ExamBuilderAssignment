@@ -21,4 +21,4 @@ $ python app.py
 
 | Plugin | LINK |
 | ------ | ------ |
-| GitHub | [plugins/github/README.md][PlGh] |
+| GitHub | https://github.com/nkcse0007/ExamBuilderAssignment/tree/master |
