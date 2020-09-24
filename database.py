@@ -1,7 +1,7 @@
 import pymongo
 
 client = pymongo.MongoClient(
-   "mongodb://127.0.0.1:27017/")
-db = client['VoiceAssistant']
+   f"mongodb://127.0.0.1:27017/")
+db = client['ExamBuilder']
 
 
